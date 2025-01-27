@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const R = require('ramda');
 const fs = require('fs');
 const axios = require('axios');
@@ -11,15 +13,22 @@ const per = 100; // Content pagination limit
 const chunkBy = 10; // N of images to download simultaneously
 let count = 0;
 
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN || null;
+const axios_config = ACCESS_TOKEN ? {
+	"headers": {
+		"Authorization": `Bearer ${process.env.ACCESS_TOKEN}`
+	}
+} : {};
+
 const channel = slug => ({
   thumb: () => {
     console.log(`Fetching the channel <${slug}>`);
-    return axios.get(`https://api.are.na/v2/channels/${slug}/thumb`);
+    return axios.get(`https://api.are.na/v2/channels/${slug}/thumb`, axios_config);
   },
 
   page: ({ page, per }) => {
     console.log(`Fetching page <${page}>`);
-    return axios.get(`https://api.are.na/v2/channels/${slug}/contents?page=${page}&per=${per}`).catch(err => {
+    return axios.get(`https://api.are.na/v2/channels/${slug}/contents?page=${page}&per=${per}`, axios_config).catch(err => {
       console.error(`Failed to download the page <${page}>: ${err.stack}`);
     });
   },
