@@ -20,6 +20,49 @@ const axios_config = ACCESS_TOKEN ? {
 	}
 } : {};
 
+const saveBookmark = async function(filename, link, dir) {
+  try {
+    // Create the .url file content
+    const data = `[InternetShortcut]
+URL=${link}
+`;
+
+    const filepath = `${dir}/${filename}.url`;
+    fs.writeFileSync(filepath, data)
+    console.log(`Bookmark saved: ${filename}.url`);
+  } catch (error) {
+    console.error(`Error saving bookmark for ID ${filename}.url:`, error.message);
+  }
+}
+
+async function saveTextToFile(filename, text, dir) {
+  try {
+    const filepath = `${dir}/${filename}.txt`;
+    fs.writeFileSync(filepath, text);
+    // fs.writeFile(filepath, text, 'utf8');
+    console.log(`Text file saved: ${filepath}`);
+  } catch (error) {
+    console.error(`Error saving text file ${filepath}:`, error.message);
+  }
+}
+
+async function saveAttachment(block, url, dir) {
+  axios.get(url, { responseType: 'arraybuffer' })
+      .then(({ data }) => {
+        const title = block.title ? parameterize(block.title) : block.id;
+        const ext = mime.extension(block.attachment.content_type);
+        const filename = `${dir}/${block.id}_${title}.${ext}`;
+        console.log(chalk.grey(`Writing <${filename}>`));
+
+        fs.writeFileSync(filename, data);
+      })
+      .catch(err => {
+        console.error(chalk.redBright(`Failed to download the block <${block.id}>: ${err.stack}`));
+      });
+}
+
+
+
 const channel = slug => ({
   thumb: () => {
     console.log(`Fetching the channel <${slug}>`);
@@ -38,6 +81,27 @@ const channel = slug => ({
 
     console.log(chalk.green(`Download #${count}: ${block.id}`))
 
+    const dir = `./downloads/${slug}`;
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+
+    const title = block.title ? parameterize(block.title) : block.id;
+
+    switch (block.class) {
+      case "Text":
+        saveTextToFile(`${block.id}_${title}`, block.content, dir);
+        break;
+      default:
+        break;
+    }
+
+    if (block.source) {
+      saveBookmark(`${block.id}_${title}`, block.source.url, dir);
+    };
+
+    if (block.attachment) {
+      saveAttachment(block, block.attachment.url, dir);
+    }
+    
     if (!block.image) {
       console.log(`Block ${block.id} not downloaded because it does not have an image`)
       return Promise.resolve()
@@ -45,11 +109,10 @@ const channel = slug => ({
 
     console.log(chalk.grey(`Downloading <${block.id}:${block.image.original.url}>`));
 
-    const dir = `./downloads/${slug}`;
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
-
     return axios
-      .get(block.image.original.url, { responseType: 'arraybuffer' })
+      .get(block.image.original.url, { responseType: 'arraybuffer', "headers": {
+        "Authorization": `Bearer ${process.env.ACCESS_TOKEN}`
+      }})
       .then(({ data }) => {
         const title = block.title ? parameterize(block.title) : block.id;
         const ext = mime.extension(block.image.content_type);
